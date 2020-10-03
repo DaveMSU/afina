@@ -45,6 +45,9 @@ public:
     // Implements Afina::Storage interface
     bool Get(const std::string &key, std::string &value) override;
 
+    // For debag
+    void print_list();
+
 private:
 
     // LRU cache node
@@ -55,11 +58,14 @@ private:
         lru_node* prev;
     };
 
+    // Update value in list
+    bool update( lru_node* node, const std::string &value );
+
     // Push to begin of the list
-    bool push( const std::string &key, const std::string &value );
+    bool push_front( lru_node* node );
 
     // Pop from end of the list
-    bool pop( lru_node &node );
+    bool pop_back();
 
     // Maximum number of bytes could be stored in this cache.
     // i.e all (keys+values) must be less the _max_size

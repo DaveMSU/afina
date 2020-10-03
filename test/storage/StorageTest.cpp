@@ -85,7 +85,7 @@ TEST(StorageTest, PutDeleteGet) {
 
     EXPECT_TRUE(storage.Put("KEY1", "val1"));
     EXPECT_TRUE(storage.Put("KEY2", "val2"));
-
+    
     EXPECT_TRUE(storage.Delete("KEY1"));
 
     std::string value;
@@ -147,7 +147,7 @@ std::string pad_space(const std::string &s, size_t length) {
 
 TEST(StorageTest, BigTest) {
     const size_t length = 20;
-    const size_t count_tests = 30000;
+    const size_t count_tests = 70000;
     SimpleLRU storage(2 * count_tests * length);
 
     for (long i = 0; i < count_tests; ++i) {
@@ -197,4 +197,5 @@ TEST(StorageTest, MaxTest) {
         std::string res;
         EXPECT_FALSE(storage.Get(key, res));
     }
+
 }
