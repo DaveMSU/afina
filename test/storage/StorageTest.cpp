@@ -23,7 +23,9 @@ TEST(StorageTest, PutGet) {
     SimpleLRU storage;
 
     EXPECT_TRUE(storage.Put("KEY1", "val1"));
-    EXPECT_TRUE(storage.Put("KEY2", "val2"));
+    storage.print_list();
+    storage.Put("KEY2", "val2");
+    storage.print_list();
     
     std::string value;
     EXPECT_TRUE(storage.Get("KEY1", value));
@@ -197,5 +199,4 @@ TEST(StorageTest, MaxTest) {
         std::string res;
         EXPECT_FALSE(storage.Get(key, res));
     }
-
 }

@@ -8,6 +8,9 @@ namespace Backend {
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::Put( const std::string &key, const std::string &value ){ 
 
+	if( key.size() + value.size() > _max_size )
+		return false;
+
 	auto it = _lru_index.find(key);
 
 	if( it != _lru_index.end() ){
@@ -18,7 +21,8 @@ bool SimpleLRU::Put( const std::string &key, const std::string &value ){
 	else{
 		lru_node* node = new lru_node{key, value, {}, {}};
 		push_front( node );
-		_lru_index.insert( {key, std::ref(*node)} );
+		//_lru_index.insert( {std::reference_wrapper<const std::string>(key), std::ref(*node)} );
+		_lru_index.emplace( std::cref(node->key), std::ref(*node) );
 	}		
 
 	return true; 
@@ -27,11 +31,15 @@ bool SimpleLRU::Put( const std::string &key, const std::string &value ){
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::PutIfAbsent( const std::string &key, const std::string &value ){
 
+	if( key.size() + value.size() > _max_size )
+		return false;
+
 	if( _lru_index.find(key) == _lru_index.end() ){			
 
 		lru_node* node = new lru_node{key, value, {}, {}};
 		push_front( node );
-		_lru_index.insert( {key, std::ref(*node)} );
+		//_lru_index.insert( {std::reference_wrapper<const std::string>(key), std::ref(*node)} );
+		_lru_index.emplace( std::cref(node->key), std::ref(*node) );
 		return true;
 	}
        
@@ -41,6 +49,9 @@ bool SimpleLRU::PutIfAbsent( const std::string &key, const std::string &value ){
 // See MapBasedGlobalLockImpl.h
 bool SimpleLRU::Set( const std::string &key, const std::string &value ){
 
+	if( key.size() + value.size() > _max_size )
+		return false;
+	
 	auto it = _lru_index.find(key);
 
 	if( it != _lru_index.end() ){
@@ -62,21 +73,19 @@ bool SimpleLRU::Delete( const std::string &key ){
 	lru_node* node = &it->second.get();
 	_lru_index.erase(it);
 
-	if( !_lru_head )
-		return false;
-	
+
 	if( node->next )
 		node->next->prev = node->prev;	
 	else
 		_lru_tail = _lru_tail->prev;	
 
-	if( node->prev ){
 
-		if ( node->next )
-			node->prev->next = std::move(node->next);
-		else
-			node->prev->next = nullptr;
-	}
+	if( node->prev )
+		node->prev->next = std::move(node->next);		
+	else
+		_lru_head = std::move(_lru_head->next);
+
+
 	_cur_size -= (node->key.size() + node->value.size());
 	return true;
 }
@@ -114,9 +123,6 @@ bool SimpleLRU::push_front( lru_node* node ){
 		_cur_size += node->key.size() + node->value.size();
 		while( _cur_size > _max_size && _lru_head)
 			pop_back();
-
-		if( _cur_size > _max_size )
-			return false;
 	}
 
 	if( node == _lru_head.get() )
@@ -208,7 +214,9 @@ void SimpleLRU::print_list(){
 		node = node->prev;
 	}
 
-	std::cout << "LIST END" << std::endl;
+	std::cout << "\nLIST END" << std::endl;
+	
+	std::cout << "---------------------------------------------" << std::endl;
 
 }
 

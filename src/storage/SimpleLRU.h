@@ -2,6 +2,7 @@
 #define AFINA_STORAGE_SIMPLE_LRU_H
 
 #include <unordered_map>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -81,7 +82,7 @@ private:
     size_t _node_count;
 
     // Index of nodes from list above, allows fast random access to elements by lru_node#key
-    std::unordered_map<std::string, std::reference_wrapper<lru_node>> _lru_index;
+    std::map<std::reference_wrapper<const std::string>, std::reference_wrapper<lru_node>, std::less<std::string>> _lru_index;
 };
 
 } // namespace Backend
