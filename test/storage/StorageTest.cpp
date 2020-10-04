@@ -23,9 +23,7 @@ TEST(StorageTest, PutGet) {
     SimpleLRU storage;
 
     EXPECT_TRUE(storage.Put("KEY1", "val1"));
-    storage.print_list();
     storage.Put("KEY2", "val2");
-    storage.print_list();
     
     std::string value;
     EXPECT_TRUE(storage.Get("KEY1", value));
@@ -149,7 +147,7 @@ std::string pad_space(const std::string &s, size_t length) {
 
 TEST(StorageTest, BigTest) {
     const size_t length = 20;
-    const size_t count_tests = 70000;
+    const size_t count_tests = 200000;
     SimpleLRU storage(2 * count_tests * length);
 
     for (long i = 0; i < count_tests; ++i) {

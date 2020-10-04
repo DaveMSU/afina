@@ -110,6 +110,8 @@ bool SimpleLRU::Get( const std::string &key, std::string &value ){
 bool SimpleLRU::update( lru_node* node, const std::string &value ){
 
 	_cur_size = _cur_size - node->value.size() + value.size();
+	while( _cur_size > _max_size )
+		pop_back();
 	node->value = value;
 }
 
@@ -121,12 +123,13 @@ bool SimpleLRU::push_front( lru_node* node ){
 	if( !node->prev && !node->next ){
 		
 		_cur_size += node->key.size() + node->value.size();
-		while( _cur_size > _max_size && _lru_head)
+		while( _cur_size > _max_size )//&& _lru_head)
 			pop_back();
 	}
 
 	if( node == _lru_head.get() )
 		return true;
+
 
 	if( _lru_head ){
 
@@ -134,6 +137,9 @@ bool SimpleLRU::push_front( lru_node* node ){
 
 		if( node->next )
 			node->next->prev = node->prev;
+		else 
+		if (node == _lru_tail)		
+			_lru_tail = _lru_tail->prev;	
 
 		if( node->prev ){
 
