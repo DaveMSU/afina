@@ -21,7 +21,6 @@ bool SimpleLRU::Put( const std::string &key, const std::string &value ){
 	else{
 		lru_node* node = new lru_node{key, value, {}, {}};
 		push_front( node );
-		//_lru_index.insert( {std::reference_wrapper<const std::string>(key), std::ref(*node)} );
 		_lru_index.emplace( std::cref(node->key), std::ref(*node) );
 	}		
 
@@ -38,7 +37,6 @@ bool SimpleLRU::PutIfAbsent( const std::string &key, const std::string &value ){
 
 		lru_node* node = new lru_node{key, value, {}, {}};
 		push_front( node );
-		//_lru_index.insert( {std::reference_wrapper<const std::string>(key), std::ref(*node)} );
 		_lru_index.emplace( std::cref(node->key), std::ref(*node) );
 		return true;
 	}
@@ -55,7 +53,8 @@ bool SimpleLRU::Set( const std::string &key, const std::string &value ){
 	auto it = _lru_index.find(key);
 
 	if( it != _lru_index.end() ){
-		
+
+		push_front( &it->second.get() );		
 		update( &it->second.get(), value );
 		return true;
 	}	
