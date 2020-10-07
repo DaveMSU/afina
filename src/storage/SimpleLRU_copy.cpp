@@ -15,13 +15,14 @@ bool SimpleLRU::Put( const std::string &key, const std::string &value ){
 
 	if( it != _lru_index.end() ){
 	
-		lru_node* current_node = &it->second.get();		
-		MoveToHead( current_node );
-		SetVal( current_node, value );
+		update( &it->second.get(), value );
+		push_front( &it->second.get() );
 	}
-	else
-		CreateNode( key, value );		
-	ClearSpace();
+	else{
+		lru_node* node = new lru_node{key, value, {}, {}};
+		push_front( node );
+		_lru_index.emplace( std::cref(node->key), std::ref(*node) );
+	}		
 
 	return true; 
 }
@@ -34,8 +35,9 @@ bool SimpleLRU::PutIfAbsent( const std::string &key, const std::string &value ){
 
 	if( _lru_index.find(key) == _lru_index.end() ){			
 
-		CreateNode( key, value );
-		ClearSpace();
+		lru_node* node = new lru_node{key, value, {}, {}};
+		push_front( node );
+		_lru_index.emplace( std::cref(node->key), std::ref(*node) );
 		return true;
 	}
        
@@ -52,10 +54,8 @@ bool SimpleLRU::Set( const std::string &key, const std::string &value ){
 
 	if( it != _lru_index.end() ){
 	
-		lru_node* current_node = &it->second.get();
-		MoveToHead( current_node );
-		SetVal( current_node, value );
-		ClearSpace();
+		push_front( &it->second.get() );	
+		update( &it->second.get(), value );
 		return true;
 	}	
 
@@ -95,9 +95,9 @@ bool SimpleLRU::Get( const std::string &key, std::string &value ){
 	
 	if( it != _lru_index.end() ){
 
-		lru_node* current_node = &it->second.get();
-		MoveToHead( current_node );
-		value = current_node->value;
+		lru_node& node = it->second.get();
+		value = node.value;
+		push_front( &node );
 
 		return true;
 	}
@@ -105,23 +105,29 @@ bool SimpleLRU::Get( const std::string &key, std::string &value ){
 	return false; 
 }
 
+bool SimpleLRU::update( lru_node* node, const std::string &value ){
 
-bool SimpleLRU::SetVal( lru_node* node, const std::string& value ){
-
-	_cur_size += value.size() - node->value.size();
+	_cur_size = _cur_size - node->value.size() + value.size();
+	while( _cur_size > _max_size )
+		pop_back();
 	node->value = value;
-
-	return true;
 }
 
-
-bool SimpleLRU::MoveToHead( lru_node* node ){
+bool SimpleLRU::push_front( lru_node* node ){
 
 	if( !node )
 		return false;
 
+	if( !node->prev && !node->next ){
+		
+		_cur_size += node->key.size() + node->value.size();
+		while( _cur_size > _max_size )//&& _lru_head)
+			pop_back();
+	}
+
 	if( node == _lru_head.get() )
 		return true;
+
 
 	if( _lru_head ){
 
@@ -132,8 +138,6 @@ bool SimpleLRU::MoveToHead( lru_node* node ){
 		else 
 		if (node == _lru_tail)		
 			_lru_tail = _lru_tail->prev;	
-		else
-			return false;
 
 		if( node->prev ){
 
@@ -157,58 +161,28 @@ bool SimpleLRU::MoveToHead( lru_node* node ){
 	return true;
 }
 
+bool SimpleLRU::pop_back(){
 
-bool SimpleLRU::CreateNode( const std::string& key, const std::string& value ){
+	_lru_index.erase(_lru_tail->key);
+	_cur_size -= (_lru_tail->key.size() + _lru_tail->value.size());
 
-	lru_node* node = new lru_node{key, value, {}, {}};
-	_cur_size += key.size() + value.size();
-	_lru_index.emplace( std::cref(node->key), std::ref(*node) );
+	if( _lru_head ){
 
-        if( _lru_head ){
+		if( _lru_tail->prev ){
 
-                std::unique_ptr<lru_node> un_node;
-                un_node.reset(node);
+			_lru_tail = _lru_tail->prev;		
+			_lru_tail->next = nullptr;
+		}
+		else{
+			_lru_head.reset();
+			_lru_tail = nullptr;
+		}
+	}
+	else
+		return false;
 
-                _lru_head->prev = node;
-                un_node->next = std::move(_lru_head);
-                _lru_head = std::move(un_node);
-        }
-        else{
-                _lru_head.reset(node);
-                _lru_tail = _lru_head.get();
-        }
-
-        return true;
+	return true;
 }
-
-
-bool SimpleLRU::ClearSpace(){
-
-	while( _cur_size > _max_size && _lru_head ){
-	     		
-        	_lru_index.erase(_lru_tail->key);
-        	_cur_size -= (_lru_tail->key.size() + _lru_tail->value.size());
-        
-        	if( _lru_head ){
-        
-        		if( _lru_tail->prev ){
-        
-        			_lru_tail = _lru_tail->prev;		
-        			_lru_tail->next = nullptr;
-        		}
-        		else{
-        			_lru_head.reset();
-        			_lru_tail = nullptr;
-        		}
-        	}
-        	else
-        		return false;
-        }
-
-	if( _lru_head ) return true;
-	else		return false;
-}
-
 
 void SimpleLRU::print_list(){
 

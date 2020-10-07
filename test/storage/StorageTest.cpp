@@ -18,19 +18,19 @@ using namespace std;
 
 
 
-
 TEST(StorageTest, PutGet) {
     SimpleLRU storage;
 
     EXPECT_TRUE(storage.Put("KEY1", "val1"));
-    storage.Put("KEY2", "val2");
-    
+    EXPECT_TRUE(storage.Put("KEY2", "val2"));
+
     std::string value;
     EXPECT_TRUE(storage.Get("KEY1", value));
     EXPECT_TRUE(value == "val1");
 
     EXPECT_TRUE(storage.Get("KEY2", value));
     EXPECT_TRUE(value == "val2");
+
 }
 
 TEST(StorageTest, PutOverwrite) {
@@ -67,6 +67,7 @@ TEST(StorageTest, PutSetGet) {
     std::string value;
     EXPECT_TRUE(storage.Get("KEY1", value));
     EXPECT_TRUE(value == "val2");
+
 }
 
 TEST(StorageTest, SetIfAbsent) {
@@ -198,3 +199,4 @@ TEST(StorageTest, MaxTest) {
         EXPECT_FALSE(storage.Get(key, res));
     }
 }
+
