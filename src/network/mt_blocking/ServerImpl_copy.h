@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <thread>
-#include <mutex>
 #include <condition_variable>
 #include <unordered_set>
 
@@ -40,7 +39,6 @@ protected:
      * Method is running in the connection acceptor thread
      */
     void OnRun();
-
     void Worker(int client_socket);
 
 private:
@@ -52,23 +50,18 @@ private:
     // bounds
     std::atomic<bool> running;
 
-    // ???
-    std::condition_variable serv_stop;
-
-    // For unique_lock in OnRun method
-    std::mutex sock_manager;
-
-    // For checking number of threads
-    int max_workers, worker_count;
-
-    // For saving client_socket
-    std::unordered_set<int> socketset;
-
     // Server socket to accept connections on
     int _server_socket;
 
     // Thread to run network on
     std::thread _thread;
+
+    int max_workers, workers_count;
+    std::unordered_set<int> socketset;
+
+    std::condition_variable serv_stop;
+    std::mutex sock_manager;
+
 };
 
 } // namespace MTblocking
@@ -76,4 +69,3 @@ private:
 } // namespace Afina
 
 #endif // AFINA_NETWORK_MT_BLOCKING_SERVER_H
-
