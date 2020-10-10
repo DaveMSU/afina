@@ -28,7 +28,7 @@ namespace Network {
 namespace MTblocking {
 
 // See Server.h
-ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl) : Server(ps, pl) {}
+ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl) : Server(ps, pl), max_workers(0), _server_socket(0) {}
 
 // See Server.h
 ServerImpl::~ServerImpl() {}
@@ -36,7 +36,6 @@ ServerImpl::~ServerImpl() {}
 // See Server.h
 void ServerImpl::Start(uint16_t port, uint32_t n_accept, uint32_t n_workers) {
     max_workers = n_workers;
-    worker_count = 0;
     _logger = pLogging->select("network");
     _logger->info("Start mt_blocking network service");
 
@@ -86,10 +85,14 @@ void ServerImpl::Stop() {
     	close(_server_socket);
 
 	max_workers = 0;
+
+	{
+		std::unique_lock<std::mutex> lock(sock_manager);
 	
-	for( auto& it : socketset ){
-		
-		shutdown(it, SHUT_RD);
+		for( auto& it : socketset ){		
+	
+			shutdown(it, SHUT_RD);
+		}
 	}
 }
 
@@ -98,7 +101,7 @@ void ServerImpl::Join() {
 
 	{
 		std::unique_lock<std::mutex> lock(sock_manager);
-		while( running.load() || worker_count != 0 ){
+		while( running.load() || socketset.size() != 0 ){
 			
 			serv_stop.wait(lock);
 		}
@@ -153,9 +156,8 @@ void ServerImpl::OnRun() {
 
 	{
 		std::unique_lock<std::mutex> lock(sock_manager);
-		if( worker_count < max_workers ){
+		if( socketset.size() < max_workers ){
 
-			++worker_count;
 			socketset.insert(client_socket);
 			std::thread cur_con(&ServerImpl::Worker, this, client_socket);
 			cur_con.detach();
@@ -184,14 +186,14 @@ void ServerImpl::OnRun() {
 
 void ServerImpl::Worker(int client_socket){
 
-	std::size_t arg_remains;
+	std::size_t arg_remains = 0;
 	Protocol::Parser parser;
-	std::string argument_for_command;
+	std::string argument_for_command = "";
 	std::unique_ptr<Execute::Command> command_to_execute;
 
 	try{        
 		int readed_bytes = -1;
-    		char client_buffer[4096];
+    		char client_buffer[4096] = "";
     		while ((readed_bytes = read(client_socket, client_buffer, sizeof(client_buffer))) > 0) {
 			_logger->debug("Got {} bytes from socket", readed_bytes);
 
@@ -280,16 +282,11 @@ void ServerImpl::Worker(int client_socket){
         close(client_socket);
 
         // Prepare for the next command: just in case if connection was closed in the middle of executing something
-        command_to_execute.reset();
-        argument_for_command.resize(0);
-        parser.Reset();
-
 
 	{
-		--worker_count;
 		std::unique_lock<std::mutex> lock(sock_manager);
 		socketset.erase(client_socket);
-		if( worker_count > 0 && !running.load() ){
+		if( socketset.size() > 0 && !running.load() ){
 
 			serv_stop.notify_all();
 		}

@@ -58,13 +58,13 @@ private:
     std::mutex sock_manager;
 
     // For checking number of threads
-    int max_workers, worker_count;
+    size_t max_workers;
 
     // For saving client_socket
     std::unordered_set<int> socketset;
 
     // Server socket to accept connections on
-    int _server_socket;
+    size_t _server_socket;
 
     // Thread to run network on
     std::thread _thread;
