@@ -156,7 +156,7 @@ void ServerImpl::OnRun() {
 
 	{
 		std::unique_lock<std::mutex> lock(sock_manager);
-		if( socketset.size() < max_workers ){
+		if( socketset.size() < max_workers && running.load() ){
 
 			socketset.insert(client_socket);
 			std::thread cur_con(&ServerImpl::Worker, this, client_socket);
@@ -278,13 +278,12 @@ void ServerImpl::Worker(int client_socket){
             _logger->error("Failed to process connection on descriptor {}: {}", client_socket, ex.what());
         }
 
-        // We are done with this connection
-        close(client_socket);
 
         // Prepare for the next command: just in case if connection was closed in the middle of executing something
 
 	{
 		std::unique_lock<std::mutex> lock(sock_manager);
+		close(client_socket); // We are done with this connection
 		socketset.erase(client_socket);
 		if( socketset.size() > 0 && !running.load() ){
 
