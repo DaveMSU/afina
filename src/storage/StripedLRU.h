@@ -21,20 +21,28 @@ namespace Backend {
  */
 class StripedLRU : public Afina::Storage {
 public:
-    StripedLRU(size_t max_size = 1024, size_t st_cnt = 1024*1024*4*2) : max_size(max_size), _stripe_count(st_cnt) {
+    StripedLRU( size_t max_size = 1024, size_t st_cnt = 4 * 2 * 1024 * 1024 * sizeof(char) ) : max_size(max_size), _stripe_count(st_cnt) {
     
 	size_t shard_size = max_size / _stripe_count;
-
-	// Max 1MB for one key, 1MB for value
-	if( shard_size > 2*1024*1024 ){
-
-		throw std::runtime_error( "Too small shard size: " + std::to_string(shard_size) );
-	}
 
 	for( size_t i = 0; i < _stripe_count; ++i ){
 
 		shard.emplace_back( new ThreadSafeSimplLRU(shard_size) );
 	}
+    }
+
+    static std::shared_ptr<StripedLRU> BuildLRU( size_t max_size = 1024, size_t st_cnt = 4 * 2 * 1024 * 1024 * sizeof(char) ){
+
+	size_t shard_size = max_size / st_cnt;
+    	
+	// Max 1MB for one key, 1MB for value
+	if( shard_size > 2 * 1024 * 1024 * sizeof(char) ){
+
+		throw std::runtime_error( "Too small shard size: " + std::to_string(shard_size) );
+	}
+	else
+		return std::make_shared<StripedLRU>( max_size, st_cnt );
+
     }
 
     ~StripedLRU() {}
