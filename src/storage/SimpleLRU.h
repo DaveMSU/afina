@@ -59,14 +59,17 @@ private:
         lru_node* prev;
     };
 
-    // Update value in list
-    bool update( lru_node* node, const std::string &value );
+    // Put node to top of the list
+    bool MoveToHead( lru_node* current_node );
 
-    // Push to begin of the list
-    bool push_front( lru_node* node );
+    // Change value in node
+    bool SetVal( lru_node* current_node, const std::string& value );
 
-    // Pop from end of the list
-    bool pop_back();
+    // Create new node on top of the list
+    bool CreateNode( const std::string& key, const std::string& value );
+
+    // Pop off last some nodes
+    bool ClearSpace();
 
     // Maximum number of bytes could be stored in this cache.
     // i.e all (keys+values) must be less the _max_size
