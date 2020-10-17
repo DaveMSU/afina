@@ -44,7 +44,10 @@ class Executor {
 
     }
 
-    ~Executor(){}
+    ~Executor(){
+    
+	Stop(true);		    
+    }
 
     /**
      * Signal thread pool to stop, it will stop accepting new jobs and close threads just after each become
@@ -56,9 +59,12 @@ class Executor {
 
 	state = State::kStopping;
 
-	for( size_t i = 0; i < threads.size(); ++i ){
+	if( await ){
 
-		threads[i].join();
+		for( size_t i = 0; i < threads.size(); ++i ){
+
+			threads[i].join();
+		}
 	}
 
 	state = State::kStopped;
