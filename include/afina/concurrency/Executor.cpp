@@ -28,23 +28,8 @@ class Executor {
         kStopped
     };
 
-    Executor( std::string name,
-              size_t size, 
-	      size_t low_wmark = 4, 
-	      size_t hight_wmark = 16,
-	      size_t wait_time = 100) : low_watermark(low_wmark),
-	                                hight_watermark(hight_wmark),
-	                                max_queue_size(size),
-				        idle_time(wait_time){
-
-    	for( size_t i = 0; i < max_queue_size; ++i ){
-
-		threads.push_back( std::thread([](){ return perform(this, i) }) );
-	} 
-
-    }
-
-    ~Executor(){}
+    Executor(std::string name, int size);
+    ~Executor();
 
     /**
      * Signal thread pool to stop, it will stop accepting new jobs and close threads just after each become
@@ -52,18 +37,7 @@ class Executor {
      *
      * In case if await flag is true, call won't return until all background jobs are done and all threads are stopped
      */
-    void Stop(bool await = false){
-
-	state = State::kStopping;
-
-	for( size_t i = 0; i < threads.size(); ++i ){
-
-		threads[i].join();
-	}
-
-	state = State::kStopped;
-    }
-
+    void Stop(bool await = false);
 
     /**
      * Add function to be executed on the threadpool. Method returns true in case if task has been placed
@@ -97,13 +71,12 @@ private:
     /**
      * Main function that all pool threads are running. It polls internal task queue and execute tasks
      */
-    friend void perform( Executor *executor, size_t th_idx );
+    friend void perform(Executor *executor);
 
     /**
      * Mutex to protect state below from concurrent modification
      */
     std::mutex mutex;
-    std::timed_mutex mutex_time;
 
     /**
      * Conditional variable to await new data in case of empty queue
@@ -124,15 +97,6 @@ private:
      * Flag to stop bg threads
      */
     State state;
-
-    /**
-     * Descriptions... tra-ta-ta...
-     */
-    size_t low_watermark;
-    size_t hight_watermakr;
-    size_t max_queue_size;
-    size_t idle_time;
-    using Ms = std::chrono::milliseconds;
 };
 
 } // namespace Concurrency
