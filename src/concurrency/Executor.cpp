@@ -3,43 +3,46 @@
 namespace Afina {
 namespace Concurrency {
 
-void perform( Executor* executor, size_t th_idx ){
+void perform( Executor* executor ){
 
 	while( executor->state == Executor::State::kRun ){ // Выполняем пока это нужно.
 
 		// Проверяем можно ли брать из очереди, если да, то
-		//  берем на исполнение задачу и исполняем, затем на while
+		//  берем на исполнение задачу и исполняем, затем возвращаемся на while,
 		//  если нет, то ждем idle_time, если за это время задача появилась, то
 		//  берем на исполнение задачу и исполняем, если нет
-		//  убиваем поток - удяляем thread объект из вектора и выходим из функции.
+		//  убиваем поток - удаляем thread объект из вектора и выходим из функции.
 		// 
-		if( empty_condition.wait_for(mutex, 
-					     std::chrono::milliseconds(executor->idle_time), 
-					     [](){ return !executor->tasks.empty(); }) ){
+		if( executor->empty_condition.wait_for(std::unique_lock<std::mutex> (executor->mutex), 
+			           		       std::chrono::milliseconds(executor->idle_time), 
+						       [executor](){ return !executor->tasks.empty(); }) ){
 		
+			std::function<void()> task;
 			{
 				// Чтобы никто другой не взял эту задачу.
 				//
-				std::unique_lock lock(mutex);
-				std::function<Execute> task = executor->tasks.front();
+				std::unique_lock<std::mutex> lock(executor->mutex);
+			        task = executor->tasks.front();
 				executor->tasks.pop_front();
 			}
 
 			task();			
 		}
 		else{
-			// Проверяем, достигли ли мы минимума, если да - создаем новый поток.
+			
+			// Поток умирает, т.к. не дождался задачи.
+			// Уменьшаем счетчик числа потоков.
 			//
-			if( executor->threads.size() == executor->low_watermark ){
-
-				size_t idx = executor->threads.size();
-				executor->threads.emplace_back(
-						std::thread([](){ return perform(executor, idx)}) );
-			}
-
-			executor->threads.erase(th_idx);
+			--executor->curr_watermark;
+			return;
 		}
 	}
+
+	// Сюда можем дойти, в случае, если в функции Stop, переменная state 
+	//  перестанет быть равна kRun, то есть когда придет время всем 
+	//  потокам завершить работу.
+	//
+	--executor->curr_watermark;
 }
 
 }

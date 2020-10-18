@@ -36,17 +36,27 @@ class Executor {
 	                                hight_watermark(hight_wmark),
 	                                max_queue_size(size),
 				        idle_time(wait_time){
+	
+	curr_watermark = 0;
+	std::unique_lock<std::mutex> lock(mutex);
+    	for( size_t i = 0; i < low_watermark; ++i ){
 
-    	for( size_t i = 0; i < max_queue_size; ++i ){
-
-		threads.push_back( std::thread([](){ return perform(this, i) }) );
+		std::thread thread([this](){ return perform(this); });
+		++curr_watermark;
+		thread.detach(); // Чтобы обеспечить безвредное завершение работы потоком при false в Stop.
 	} 
-
     }
 
     ~Executor(){
     
-	Stop(true);		    
+	if( state != State::kRun ){
+
+		Stop(true);		    
+	}
+	else{
+	
+		throw std::runtime_error("Executor already stopping or stopped!");
+	}
     }
 
     /**
@@ -55,15 +65,26 @@ class Executor {
      *
      * In case if await flag is true, call won't return until all background jobs are done and all threads are stopped
      */
-    void Stop(bool await = false){
+    void Stop( bool await = false ){
 
+	// Теперь все потоки, выполняющие функцию perform
+	//  придя на while, закончат работу.
+	//
 	state = State::kStopping;
 
+	// Если True, то дожидаемся пока они все не завершат работу,
+	//  иначе, просто выходим из функции, доверяя потокам, что 
+	//  такая асинхронная работа ничему не навредит.
+	//
 	if( await ){
 
-		for( size_t i = 0; i < threads.size(); ++i ){
-
-			threads[i].join();
+		while( curr_watermark > 0 ){ ;
+		
+			// Нужен ли тут cv? 
+			// Мне кажется, что нет.
+			// Единственное, что смущает
+			//  мб зацикливание будет
+			//  затратнее, чем ожидание на cv.
 		}
 	}
 
@@ -84,12 +105,32 @@ class Executor {
 
         std::unique_lock<std::mutex> lock(this->mutex);
         if (state != State::kRun) {
-            return false;
+
+		return false;
         }
 
         // Enqueue new task
+	if( tasks.size() == max_queue_size ){
+
+		return false;
+	}
         tasks.push_back(exec);
-        empty_condition.notify_one();
+        empty_condition.notify_all(); // Иначе при '..._one()' выродится в однопоточную.
+	while( curr_watermark < hight_watermark && !tasks.empty() ){
+		
+		std::thread thread([this](){ return perform(this); });
+		++curr_watermark;
+		thread.detach();
+	}
+
+	// Увеличиться кол-во задач, может только в этой функции.
+	//  поэтому не нужна синхранизация mutex'ами.
+	//
+	if( !tasks.empty() ){
+
+		return false;
+	}
+
         return true;
     }
 
@@ -103,7 +144,7 @@ private:
     /**
      * Main function that all pool threads are running. It polls internal task queue and execute tasks
      */
-    friend void perform( Executor *executor, size_t th_idx );
+    friend void perform( Executor *executor );
 
     /**
      * Mutex to protect state below from concurrent modification
@@ -114,11 +155,6 @@ private:
      * Conditional variable to await new data in case of empty queue
      */
     std::condition_variable empty_condition;
-
-    /**
-     * Vector of actual threads that perorm execution
-     */
-    std::vector<std::thread> threads;
 
     /**
      * Task queue
@@ -133,8 +169,9 @@ private:
     /**
      * Descriptions... tra-ta-ta...
      */
+    size_t curr_watermark;
     size_t low_watermark;
-    size_t hight_watermakr;
+    size_t hight_watermark;
     size_t max_queue_size;
     size_t idle_time;
 };
