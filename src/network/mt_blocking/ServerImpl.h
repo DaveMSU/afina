@@ -3,6 +3,8 @@
 
 #include <atomic>
 #include <thread>
+#include <condition_variable>
+#include <unordered_set>
 
 #include <afina/network/Server.h>
 
@@ -38,6 +40,8 @@ protected:
      */
     void OnRun();
 
+    void Worker(int client_socket);
+
 private:
     // Logger instance
     std::shared_ptr<spdlog::logger> _logger;
@@ -47,8 +51,20 @@ private:
     // bounds
     std::atomic<bool> running;
 
+    // ???
+    std::condition_variable serv_stop;
+
+    // For unique_lock in OnRun method
+    std::mutex sock_manager;
+
+    // For checking number of threads
+    size_t max_workers;
+
+    // For saving client_socket
+    std::unordered_set<int> socketset;
+
     // Server socket to accept connections on
-    int _server_socket;
+    size_t _server_socket;
 
     // Thread to run network on
     std::thread _thread;
@@ -59,3 +75,4 @@ private:
 } // namespace Afina
 
 #endif // AFINA_NETWORK_MT_BLOCKING_SERVER_H
+

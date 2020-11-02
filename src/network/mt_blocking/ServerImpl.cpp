@@ -20,7 +20,6 @@
 #include <afina/Storage.h>
 #include <afina/execute/Command.h>
 #include <afina/logging/Service.h>
-#include <afina/concurrency/Executor.h>
 
 #include "protocol/Parser.h"
 
@@ -123,7 +122,6 @@ void ServerImpl::OnRun() {
     Protocol::Parser parser;
     std::string argument_for_command;
     std::unique_ptr<Execute::Command> command_to_execute;
-    std::Executor Executor("EX_name", 16);
     while (running.load()) {
         _logger->debug("waiting for connection...");
 
@@ -161,7 +159,8 @@ void ServerImpl::OnRun() {
 		if( socketset.size() < max_workers && running.load() ){
 
 			socketset.insert(client_socket);
-			Executor.execute(&ServerImpl::Worker, this, client_socket);
+			std::thread cur_con(&ServerImpl::Worker, this, client_socket);
+			cur_con.detach();
 		}
 		else{
 
@@ -297,4 +296,3 @@ void ServerImpl::Worker(int client_socket){
 } // namespace MTblocking
 } // namespace Network
 } // namespace Afina
-

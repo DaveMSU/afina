@@ -20,7 +20,7 @@ namespace STnonblock {
 class Connection {
 public:
     Connection( int s, 
-		std::shared_ptr<spdlog::logger> &logger
+		std::shared_ptr<spdlog::logger> &logger,
 	        std::shared_ptr<Afina::Storage> &pStorage ) : _socket(s), 
 							      _logger{logger},
                                                               pStorage{pStorage}{
@@ -53,6 +53,9 @@ private:
     size_t _arg_remains;
     std::string _argument_for_command;
     std::unique_ptr<Execute::Command> _command_to_execute;    
+    Protocol::Parser parser;
+    size_t arg_remains;
+    std::string argument_for_command;
     char _client_buffer[4096];
 
 };
