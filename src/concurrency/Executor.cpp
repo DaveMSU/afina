@@ -11,9 +11,11 @@ void perform( Executor* executor ){
 		//  берем на исполнение задачу и исполняем, затем возвращаемся на while,
 		//  если нет, то ждем idle_time, если за это время задача появилась, то
 		//  берем на исполнение задачу и исполняем, если нет
-		//  убиваем поток - удаляем thread объект из вектора и выходим из функции.
-		// 
-		if( executor->empty_condition.wait_for(std::unique_lock<std::mutex> (executor->mutex), 
+		//  убиваем поток - выходим из функции.
+		//
+		std::unique_lock<std::mutex> lock(executor->mutex);
+
+		if( executor->empty_condition.wait_for(lock,
 			           		       std::chrono::milliseconds(executor->idle_time), 
 						       [executor](){ return !executor->tasks.empty(); }) ){
 		

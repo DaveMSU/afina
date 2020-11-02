@@ -16,6 +16,7 @@ namespace Concurrency {
  * # Thread pool
  */
 class Executor {
+public:	
     enum class State {
         // Threadpool is fully operational, tasks could be added and get executed
         kRun,

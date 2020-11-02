@@ -123,7 +123,7 @@ void ServerImpl::OnRun() {
     Protocol::Parser parser;
     std::string argument_for_command;
     std::unique_ptr<Execute::Command> command_to_execute;
-    std::Executor Executor("EX_name", 16);
+    Afina::Concurrency::Executor Executer("EX_name", 16);
     while (running.load()) {
         _logger->debug("waiting for connection...");
 
@@ -161,7 +161,7 @@ void ServerImpl::OnRun() {
 		if( socketset.size() < max_workers && running.load() ){
 
 			socketset.insert(client_socket);
-			Executor.execute(&ServerImpl::Worker, this, client_socket);
+			Executer.Execute(&ServerImpl::Worker, this, client_socket);
 		}
 		else{
 
