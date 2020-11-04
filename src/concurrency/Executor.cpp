@@ -27,8 +27,14 @@ void perform( Executor* executor ){
 			        task = executor->tasks.front();
 				executor->tasks.pop_front();
 			}
-
-			task();			
+			
+			try {
+				task();			
+			}
+			catch(...){
+				
+				throw std::runtime_error("exec command from queue was incorrectly runned!");
+			}
 		}
 		else{
 			
@@ -36,6 +42,10 @@ void perform( Executor* executor ){
 			// Уменьшаем счетчик числа потоков.
 			//
 			--executor->curr_watermark;
+
+			if( executor->curr_watermark == 0 )
+				executor->no_workers_condition.notify_one();
+
 			return;
 		}
 	}
@@ -45,6 +55,11 @@ void perform( Executor* executor ){
 	//  потокам завершить работу.
 	//
 	--executor->curr_watermark;
+	if( executor->curr_watermark == 0 ){
+
+		executor->no_workers_condition.notify_one();
+		executor->state = executor->State::kStopped;
+	}
 }
 
 }

@@ -79,17 +79,13 @@ public:
 	//
 	if( await ){
 
-		while( curr_watermark > 0 ){ ;
+		std::unique_lock<std::mutex> lock(mutex);
+
+		while( curr_watermark ){
 		
-			// Нужен ли тут cv? 
-			// Мне кажется, что нет.
-			// Единственное, что смущает
-			//  мб зацикливание будет
-			//  затратнее, чем ожидание на cv.
+	       		no_workers_condition.wait(lock);
 		}
 	}
-
-	state = State::kStopped;
     }
 
 
@@ -116,7 +112,7 @@ public:
 		return false;
 	}
         tasks.push_back(exec);
-        empty_condition.notify_all(); // Иначе при '..._one()' выродится в однопоточную.
+        empty_condition.notify_one(); // Иначе при '..._one()' выродится в однопоточную.
 	while( curr_watermark < hight_watermark && !tasks.empty() ){
 		
 		std::thread thread([this](){ return perform(this); });
@@ -156,6 +152,8 @@ private:
      * Conditional variable to await new data in case of empty queue
      */
     std::condition_variable empty_condition;
+
+    std::condition_variable no_workers_condition;
 
     /**
      * Task queue
