@@ -14,9 +14,10 @@ void perform( Executor* executor ){
 		//  убиваем поток - выходим из функции.
 		//
 		std::unique_lock<std::mutex> lock(executor->mutex);
+		auto now = std::chrono::system_clock::now();
 
-		if( executor->empty_condition.wait_for(lock,
-			           		       std::chrono::milliseconds(executor->idle_time), 
+		if( executor->empty_condition.wait_until(lock,
+			           		       now + std::chrono::milliseconds(executor->idle_time), 
 						       [executor](){ return !executor->tasks.empty(); }) ){
 		
 			std::function<void()> task;
