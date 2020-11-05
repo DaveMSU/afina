@@ -25,7 +25,7 @@ public:
 							      _logger{logger},
                                                               pStorage{pStorage}{
 
-        std::memset(&_event, 0, sizeof(struct epoll_event));
+        //std::memset(&_event, 0, sizeof(struct epoll_event));
         _event.data.ptr = this;
     }
 

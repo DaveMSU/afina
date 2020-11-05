@@ -12,7 +12,7 @@ void Connection::Start(){
 
 	_event.events |= EPOLLIN | EPOLLERR | EPOLLHUP;
 
-	_logger->debug("Connection started with {} event", _event);
+	_logger->debug("Connection started with {} event", _socket);
 }
 
 // See Connection.h
