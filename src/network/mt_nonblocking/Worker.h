@@ -1,6 +1,8 @@
 #ifndef AFINA_NETWORK_MT_NONBLOCKING_WORKER_H
 #define AFINA_NETWORK_MT_NONBLOCKING_WORKER_H
 
+#include "ServerImpl.h" // Для конструктора.
+
 #include <atomic>
 #include <memory>
 #include <thread>
@@ -27,7 +29,7 @@ namespace MTnonblock {
  */
 class Worker {
 public:
-    Worker(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Afina::Logging::Service> pl);
+    Worker(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Afina::Logging::Service> pl, Afina::Network::MTnonblock::ServerImpl* addr) : _pStorage(ps), _logger(pl), isRunning(false), _epoll_fd(-1),  _addr(addr);
     ~Worker();
 
     Worker(Worker &&);
@@ -81,6 +83,9 @@ private:
 
     // EPOLL descriptor using for events processing
     int _epoll_fd;
+
+    // Чтобы worker'у дать возможнолсть обращаться к полям сервера (таким как un_map сокетов, ...).
+    Afina::Network::MTnonblock::ServerImpl * _addr;
 };
 
 } // namespace MTnonblock

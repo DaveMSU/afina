@@ -3,7 +3,11 @@
 
 #include <thread>
 #include <vector>
+#include <unordered_map>
+#include <atomic>
 
+
+#include "Connection.h"
 #include <afina/network/Server.h>
 
 namespace spdlog {
@@ -23,6 +27,12 @@ class Worker;
  */
 class ServerImpl : public Server {
 public:
+
+    // Чтобы все worker'ы знали друг о друге.
+    std::mutex sock_manager;
+    std::atomic<int> workers_count;
+    std::unordered_map<int, Connection *> connections;
+
     ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl);
     ~ServerImpl();
 
@@ -49,7 +59,7 @@ private:
     uint16_t listen_port;
 
     // Socket to accept new connection on, shared between acceptors
-    int _server_socket;
+    int _socket;
 
     // Threads that accepts new connections, each has private epoll instance
     // but share global server socket
