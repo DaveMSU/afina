@@ -34,7 +34,6 @@ void Connection::DoRead(){
 
 	try {
     		int readed_bytes = -1;
-    		char client_buffer[4096];
     		while ((readed_bytes = read(_socket, client_buffer, sizeof(client_buffer))) > 0) {
 			_logger->debug("Got {} bytes from socket", readed_bytes);
 

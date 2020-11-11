@@ -43,6 +43,7 @@ private:
     friend class ServerImpl;
 
     int _socket;
+    char client_buffer[4096];
     struct epoll_event _event;
     std::deque<std::string> q_commands;
     
