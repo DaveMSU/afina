@@ -5,7 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <atomic>
-
+#include <set>
 
 #include "Connection.h"
 #include <afina/network/Server.h>
@@ -73,6 +73,8 @@ private:
 
     // threads serving read/write requests
     std::vector<Worker> _workers;
+    std::set<Connection *> socket_set;
+    std::mutex _mutex;
 };
 
 } // namespace MTnonblock

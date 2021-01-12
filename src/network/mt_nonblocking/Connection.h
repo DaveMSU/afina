@@ -63,7 +63,8 @@ private:
     Protocol::Parser parser;
     size_t arg_remains;
     std::string argument_for_command;
-    char _client_buffer[4096];
+    char client_buffer[4096];
+    size_t offset_position;
 
 };
 

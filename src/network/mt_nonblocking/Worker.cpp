@@ -167,13 +167,13 @@ void Worker::OnRun() {
         }
         // TODO: Select timeout...
 	
+	std::unique_lock<std::mutex> lock(_addr->sock_manager, std::try_to_lock);
         _addr->workers_count--;
     
     	if (_addr->workers_count.load(std::memory_order_relaxed) == 0) {
 
 		// *
 
-		std::unique_lock<std::mutex> lock(_addr->sock_manager, std::try_to_lock);
         	if (lock.owns_lock()) {
                 	
 			// Чтобы никто не успел зайти в *.
