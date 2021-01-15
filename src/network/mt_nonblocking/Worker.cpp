@@ -191,7 +191,8 @@ void Worker::OnRun() {
 				_addr->workers_count--;                        
 			}
                 }
-        }	
+        }
+    	}	
 	
     _logger->warn("Worker stopped");
 }

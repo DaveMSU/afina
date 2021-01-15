@@ -22,7 +22,7 @@
 
 namespace Afina {
 namespace Network {
-namespace STnonblock {
+namespace MTnonblock {
 
 class Connection {
 public:
@@ -40,16 +40,17 @@ public:
 
     void Start();
 
-protected:
+//protected:
     void OnError();
     void OnClose();
-    void DoRead();
     void DoWrite();
+    void DoRead();
 
-private:
+//private:
     friend class ServerImpl;
 
     int _socket;
+    bool _alive;
     struct epoll_event _event;
     std::deque<std::string> q_commands;
     
@@ -68,7 +69,7 @@ private:
 
 };
 
-} // namespace STnonblock
+} // namespace MTnonblock
 } // namespace Network
 } // namespace Afina
 

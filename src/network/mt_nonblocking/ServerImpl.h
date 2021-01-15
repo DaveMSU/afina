@@ -59,7 +59,7 @@ private:
     uint16_t listen_port;
 
     // Socket to accept new connection on, shared between acceptors
-    int _socket;
+    int _server_socket;
 
     // Threads that accepts new connections, each has private epoll instance
     // but share global server socket

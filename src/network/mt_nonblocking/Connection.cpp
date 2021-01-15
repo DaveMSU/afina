@@ -8,7 +8,7 @@
 
 namespace Afina {
 namespace Network {
-namespace STnonblock {
+namespace MTnonblock {
 
 // See Connection.h
 void Connection::Start(){ 
@@ -21,6 +21,7 @@ void Connection::Start(){
 // See Connection.h
 void Connection::OnError(){ 
 
+	_alive = false;
 	_logger->error("Error on current connection");
 }
 
@@ -28,7 +29,7 @@ void Connection::OnError(){
 void Connection::OnClose(){
 
         close(_socket);
-
+	_alive = false;
  	_logger->debug("Conncetion closed");	
 }
 
@@ -128,13 +129,19 @@ void Connection::DoRead(){
 	std::atomic_thread_fence(std::memory_order_release); // Выгружаем кэш в оперативу.
 
         } catch (std::runtime_error &ex) {
-
+			
+		std::atomic_thread_fence(std::memory_order_release);	
     		_logger->error("Failed to process connection on descriptor {}: {}", _socket, ex.what());
+		_alive = false;
         }
 }
 
 // See Connection.h
 void Connection::DoWrite(){
+
+	if( !_alive ){
+		return;
+	}
 	
 	size_t all_sent = 0;
 	std::atomic_thread_fence(std::memory_order_acquire);
@@ -164,6 +171,6 @@ void Connection::DoWrite(){
 	}
 }
 
-} // namespace STnonblock
+} // namespace MTnonblock
 } // namespace Network
 } // namespace Afina

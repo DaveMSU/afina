@@ -124,10 +124,8 @@ void ServerImpl::Stop() {
         throw std::runtime_error("Failed to wakeup workers");
     }
 
-    for( auto &it: socket_set ){
-
-        close(it->_socket);
-        delete it;
+    for( auto &it: socket_set ){    
+    	shutdown(it->_socket, SHUT_RD);
     }    
 }
 
@@ -203,7 +201,7 @@ void ServerImpl::OnRun() {
                 }
 
                 // Register the new FD to be monitored by epoll.
-                Connection *pc = new Connection(infd);
+                Connection *pc = new Connection(infd, _logger, pStorage);
                 if (pc == nullptr) {
                     throw std::runtime_error("Failed to allocate connection");
                 }

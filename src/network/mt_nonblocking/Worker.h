@@ -29,7 +29,7 @@ namespace MTnonblock {
  */
 class Worker {
 public:
-    Worker(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Afina::Logging::Service> pl, Afina::Network::MTnonblock::ServerImpl* addr) : _pStorage(ps), _logger(pl), isRunning(false), _epoll_fd(-1),  _addr(addr);
+    Worker(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Afina::Logging::Service> pl);//, Afina::Network::MTnonblock::ServerImpl* addr) : _pStorage(ps), _logger(pl), isRunning(false), _epoll_fd(-1),  _addr(addr);
     ~Worker();
 
     Worker(Worker &&);

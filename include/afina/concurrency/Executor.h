@@ -15,6 +15,7 @@ namespace Concurrency {
 /**
  * # Thread pool
  */
+
 class Executor {
 public:	
     enum class State {
