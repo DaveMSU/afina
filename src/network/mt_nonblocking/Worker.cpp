@@ -20,11 +20,6 @@ namespace Afina {
 namespace Network {
 namespace MTnonblock {
 
-// Где лучше реализовывать? В .h или в .cpp?
-// Мне помнится, что есть важная причина описывать конструктор
-//  и деструктор в .h, это так?
-
-/*
 // See Worker.h
 Worker::Worker(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Afina::Logging::Service> pl)
     : _pStorage(ps), _pLogging(pl), isRunning(false), _epoll_fd(-1) {
@@ -35,7 +30,6 @@ Worker::Worker(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Afina::Loggin
 Worker::~Worker() {
     // TODO: implementation here
 }
-*/
 
 // See Worker.h
 Worker::Worker(Worker &&other) { *this = std::move(other); }
@@ -82,9 +76,6 @@ void Worker::OnRun() {
     // for events to avoid thundering herd type behavior.
     int timeout = -1;
     std::array<struct epoll_event, 64> mod_list;
-
-    _addr->workers_count++;
-
     while (isRunning) {
         int nmod = epoll_wait(_epoll_fd, &mod_list[0], mod_list.size(), timeout);
         _logger->debug("Worker wokeup: {} events", nmod);
@@ -100,9 +91,6 @@ void Worker::OnRun() {
             }
 
             // Some connection gets new data
-	    
-	    // Текущий connection, кот-ый обрабатывается в данный момент.
-	    //
             Connection *pconn = static_cast<Connection *>(current_event.data.ptr);
             if ((current_event.events & EPOLLERR) || (current_event.events & EPOLLHUP)) {
                 _logger->debug("Got EPOLLERR or EPOLLHUP, value of returned events: {}", current_event.events);
@@ -123,77 +111,25 @@ void Worker::OnRun() {
             }
 
             // Rearm connection
-            if (pconn->isAlive()) { // Живой?
-
-		// Живой!
-		    
+            if (pconn->isAlive()) {
                 pconn->_event.events |= EPOLLONESHOT;
                 int epoll_ctl_retval;
                 if ((epoll_ctl_retval = epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, pconn->_socket, &pconn->_event))) {
                     _logger->debug("epoll_ctl failed during connection rearm: error {}", epoll_ctl_retval);
                     pconn->OnError();
-			
-		    // Всё плохо, закрываем conn-tion и удаляем его.
-                    close(pconn->_socket);
-                    {
-                        std::unique_lock<std::mutex> lock(_addr->sock_manager);
-                        _addr->connections.erase(pconn->_socket);
-                    }		    
-
                     delete pconn;
                 }
             }
             // Or delete closed one
             else {
-
-		// Мертвый!
-
                 if (epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, pconn->_socket, &pconn->_event)) {
                     std::cerr << "Failed to delete connection!" << std::endl;
-
-                    std::cerr << "Failed to delete connection! " << std::string(strerror(errno)) << std::endl;
-
                 }
-                
-		// Всё плохо, закрываем conn-tion и удаляем его.
-		close(pconn->_socket);
-                {
-                    std::unique_lock<std::mutex> lock(_addr->sock_manager);
-                    _addr->connections.erase(pconn->_socket);
-                }		
-
                 delete pconn;
             }
         }
         // TODO: Select timeout...
-	
-	std::unique_lock<std::mutex> lock(_addr->sock_manager, std::try_to_lock);
-        _addr->workers_count--;
-    
-    	if (_addr->workers_count.load(std::memory_order_relaxed) == 0) {
-
-		// *
-
-        	if (lock.owns_lock()) {
-                	
-			// Чтобы никто не успел зайти в *.
-			//
-			if (_addr->workers_count.load(std::memory_order_relaxed) == 0) {
-                    		
-				// Закрыаем все сокеты.
-				//
-				for( auto it = _addr->connections.begin(); it != _addr->connections.end(); it++ ) {
-                        	
-					close(it->second->_socket);
-		                        delete it->second;
-		                }
-                    
-				_addr->workers_count--;                        
-			}
-                }
-        }
-    	}	
-	
+    }
     _logger->warn("Worker stopped");
 }
 

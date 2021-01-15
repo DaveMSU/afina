@@ -3,11 +3,11 @@
 
 #include <atomic>
 #include <thread>
-#include <mutex>
 #include <unordered_set>
-#include <condition_variable>
 
 #include <afina/network/Server.h>
+
+#include <condition_variable>
 
 namespace spdlog {
 class logger;
@@ -41,7 +41,10 @@ protected:
      */
     void OnRun();
 
-    void Worker(int);
+    /**
+     * Worker method for request processing
+     * */
+    void OnWorkerRun(int client_socket);
 
 private:
     // Logger instance
@@ -50,18 +53,21 @@ private:
     // Atomic flag to notify threads when it is time to stop. Note that
     // flag must be atomic in order to safely publisj changes cross thread
     // bounds
-    std::atomic<bool> running;
+    std::atomic<bool> running{false};
 
     // Server socket to accept connections on
     int _server_socket;
-    size_t max_workers;
 
     // Thread to run network on
     std::thread _thread;
-    std::condition_variable serv_stop;
 
-    std::mutex sock_manager;
-    std::unordered_set<int> socketset;
+    // Amount of currently active connections
+    std::atomic<int> _connections{0};
+    const int _max_connections = 5;
+    std::mutex _m_conn;
+    std::condition_variable _cv_conn;
+    std::mutex _m_client_sockets;
+    std::unordered_set<int> _client_sockets;
 };
 
 } // namespace MTblocking

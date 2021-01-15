@@ -33,11 +33,7 @@ namespace MTnonblock {
 ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl) : Server(ps, pl) {}
 
 // See Server.h
-ServerImpl::~ServerImpl() {
-
-	Stop();
-	Join();
-}
+ServerImpl::~ServerImpl() {}
 
 // See Server.h
 void ServerImpl::Start(uint16_t port, uint32_t n_acceptors, uint32_t n_workers) {
@@ -123,10 +119,6 @@ void ServerImpl::Stop() {
     if (eventfd_write(_event_fd, 1)) {
         throw std::runtime_error("Failed to wakeup workers");
     }
-
-    for( auto &it: socket_set ){    
-    	shutdown(it->_socket, SHUT_RD);
-    }    
 }
 
 // See Server.h
@@ -201,7 +193,7 @@ void ServerImpl::OnRun() {
                 }
 
                 // Register the new FD to be monitored by epoll.
-                Connection *pc = new Connection(infd, _logger, pStorage);
+                Connection *pc = new Connection(infd);
                 if (pc == nullptr) {
                     throw std::runtime_error("Failed to allocate connection");
                 }
@@ -213,15 +205,9 @@ void ServerImpl::OnRun() {
                     int epoll_ctl_retval;
                     if ((epoll_ctl_retval = epoll_ctl(_data_epoll_fd, EPOLL_CTL_ADD, pc->_socket, &pc->_event))) {
                         _logger->debug("epoll_ctl failed during connection register in workers'epoll: error {}", epoll_ctl_retval);
-			close(pc->_socket);
                         pc->OnError();
                         delete pc;
                     }
-		    else{
-
-	    		std::lock_guard<std::mutex> lock(_mutex);
-			socket_set.insert(pc);
-		    }
                 }
             }
         }
@@ -232,4 +218,3 @@ void ServerImpl::OnRun() {
 } // namespace MTnonblock
 } // namespace Network
 } // namespace Afina
-
