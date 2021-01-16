@@ -32,11 +32,19 @@ namespace STcoroutine {
 ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl) : Server(ps, pl) {}
 
 // See Server.h
-ServerImpl::~ServerImpl() {}
+ServerImpl::~ServerImpl() {
+    if (started) {
+        if (!stopped) 
+            Stop();
+        if (!joined)
+            Join();
+    }
+}
 
 // See Server.h
 void ServerImpl::Start(uint16_t port, uint32_t n_acceptors, uint32_t n_workers) {
     _logger = pLogging->select("network");
+    //_logger->set_level(spdlog::level::debug);
     _logger->info("Start st_nonblocking network service");
 
     sigset_t sig_mask;
@@ -64,6 +72,8 @@ void ServerImpl::Start(uint16_t port, uint32_t n_acceptors, uint32_t n_workers) 
         throw std::runtime_error("Socket setsockopt() failed: " + std::string(strerror(errno)));
     }
 
+
+
     if (bind(_server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         close(_server_socket);
         throw std::runtime_error("Socket bind() failed: " + std::string(strerror(errno)));
@@ -80,7 +90,9 @@ void ServerImpl::Start(uint16_t port, uint32_t n_acceptors, uint32_t n_workers) 
         throw std::runtime_error("Failed to create epoll file descriptor: " + std::string(strerror(errno)));
     }
 
-    _work_thread = std::thread(&ServerImpl::OnRun, this);
+    _work_thread = std::thread(
+        [this] {this->_engine.start(static_cast<void (*)(ServerImpl*)>([](ServerImpl* s) { s->OnRun(); }), this);});
+    started = true;
 }
 
 // See Server.h
@@ -91,17 +103,26 @@ void ServerImpl::Stop() {
     if (eventfd_write(_event_fd, 1)) {
         throw std::runtime_error("Failed to wakeup workers");
     }
+    
+    for (auto it = connections.begin();it != connections.end();it++) {
+        shutdown(it->second->_socket, SHUT_RD);
+    }
+    shutdown(_server_socket, SHUT_RDWR);
+    close(_server_socket);
+    stopped = true;
 }
 
 // See Server.h
 void ServerImpl::Join() {
     // Wait for work to be complete
     _work_thread.join();
+    joined = true;
 }
 
 // See ServerImpl.h
 void ServerImpl::OnRun() {
     _logger->info("Start acceptor");
+    _ctx = _engine.cur_routine;
     int epoll_descr = epoll_create1(0);
     if (epoll_descr == -1) {
         throw std::runtime_error("Failed to create epoll file descriptor: " + std::string(strerror(errno)));
@@ -133,7 +154,7 @@ void ServerImpl::OnRun() {
                 _logger->debug("Break acceptor due to stop signal");
                 run = false;
                 continue;
-            } else if (current_event.data.fd == _server_socket) {
+            } else if (current_event.data.fd == _server_socket && run) {
                 OnNewConnection(epoll_descr);
                 continue;
             }
@@ -147,36 +168,47 @@ void ServerImpl::OnRun() {
             } else if (current_event.events & EPOLLRDHUP) {
                 pc->OnClose();
             } else {
-                // Depends on what connection wants...
-                if (current_event.events & EPOLLIN) {
-                    pc->DoRead();
-                }
-                if (current_event.events & EPOLLOUT) {
-                    pc->DoWrite();
+                if (current_event.events & EPOLLIN || current_event.events & EPOLLOUT) {
+                    _engine.sched(pc->_ctx);
                 }
             }
 
             // Does it alive?
-            if (!pc->isAlive()) {
+            if (!(pc->isAlive())) {
                 if (epoll_ctl(epoll_descr, EPOLL_CTL_DEL, pc->_socket, &pc->_event)) {
                     _logger->error("Failed to delete connection from epoll");
                 }
-
+                if (pc->_ctx) {
+                    pc->OnClose();
+                    _engine.sched(pc->_ctx);
+                }
+                
                 close(pc->_socket);
-                pc->OnClose();
 
+                connections.erase(pc->_socket);
                 delete pc;
             } else if (pc->_event.events != old_mask) {
                 if (epoll_ctl(epoll_descr, EPOLL_CTL_MOD, pc->_socket, &pc->_event)) {
                     _logger->error("Failed to change connection event mask");
 
-                    close(pc->_socket);
-                    pc->OnClose();
+                    if (pc->_ctx) {
+                        pc->OnClose();
+                        _engine.sched(pc->_ctx);
+                    }
 
+                    close(pc->_socket);
+
+                    connections.erase(pc->_socket);
                     delete pc;
                 }
             }
         }
+    }
+    for (auto it = connections.begin();it != connections.end();it++) {
+        it->second->OnClose();
+        _engine.sched(it->second->_ctx);
+        close(it->second->_socket);
+        delete it->second;
     }
     _logger->warn("Acceptor stopped");
 }
@@ -207,22 +239,32 @@ void ServerImpl::OnNewConnection(int epoll_descr) {
         }
 
         // Register the new FD to be monitored by epoll.
-        Connection *pc = new (std::nothrow) Connection(infd);
+        Connection *pc = new(std::nothrow) Connection(infd, pStorage, _logger);
+        connections.emplace(std::make_pair(infd, pc));
+        //auto pc = &connections.find(infd)->second;
         if (pc == nullptr) {
             throw std::runtime_error("Failed to allocate connection");
         }
 
         // Register connection in worker's epoll
         pc->Start();
+
+        pc->_ctx = static_cast<Afina::Coroutine::Engine::context*>(
+            _engine.run(static_cast<void (*)(Connection&, Afina::Coroutine::Engine&)>([](Connection& pc,
+                    Afina::Coroutine::Engine& engine) { pc.Process(engine); }), (Connection&)*pc, _engine));
+        pc->server_courutine = _engine.cur_routine;
+
         if (pc->isAlive()) {
             if (epoll_ctl(epoll_descr, EPOLL_CTL_ADD, pc->_socket, &pc->_event)) {
                 pc->OnError();
+                close(pc->_socket);
+                connections.erase(infd);
                 delete pc;
             }
         }
     }
 }
 
-} // namespace STcoroutine
+} // namespace STnonblock
 } // namespace Network
 } // namespace Afina

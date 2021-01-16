@@ -3,7 +3,11 @@
 
 #include <thread>
 #include <vector>
+#include <unordered_map>
 
+#include "Connection.h"
+#include "Utils.h"
+#include <afina/coroutine/Engine.h>
 #include <afina/network/Server.h>
 
 namespace spdlog {
@@ -56,10 +60,19 @@ private:
 
     // IO thread
     std::thread _work_thread;
+
+    std::unordered_map<int, Connection *> connections;
+
+    bool stopped = false;
+    bool joined = false;
+    bool started = false;
+
+    Afina::Coroutine::Engine _engine;
+    Afina::Coroutine::Engine::context* _ctx = nullptr;
 };
 
-} // namespace STcoroutine
+} // namespace STnonblock
 } // namespace Network
 } // namespace Afina
 
-#endif // AFINA_NETWORK_ST_COROUTINE_SERVER_H
+#endif // AFINA_NETWORK_ST_NONBLOCKING_SERVER_H
