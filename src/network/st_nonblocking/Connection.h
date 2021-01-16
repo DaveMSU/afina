@@ -44,6 +44,7 @@ private:
 
     int _socket;
     char client_buffer[4096];
+    size_t offset_position;
     struct epoll_event _event;
     std::deque<std::string> q_commands;
     
@@ -58,6 +59,7 @@ private:
     size_t arg_remains;
     std::string argument_for_command;
     char _client_buffer[4096];
+
 
 };
 

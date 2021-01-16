@@ -41,14 +41,16 @@ void Connection::DoRead(){
 			// for example:
 	                // - read#0: [<command1 start>]
         	        // - read#1: [<command1 end> <argument> <command2> <argument for command 2> <command3> ... ]
-	                while (readed_bytes > 0){
+	                while (offset_position > 0){
 
-    				_logger->debug("Process {} bytes", readed_bytes);
+
+
+    				_logger->debug("Process {} bytes", offset_position);
     	                // There is no command yet
 			if (!_command_to_execute) {
 
 				std::size_t parsed = 0;
-				if (parser.Parse(client_buffer, readed_bytes, parsed)) {
+				if (parser.Parse(client_buffer, offset_position, parsed)) {
 
         	                    // There is no command to be launched, continue to parse input stream
                 	            // Here we are, current chunk finished some command, process it
@@ -67,22 +69,22 @@ void Connection::DoRead(){
 	                            break;
 	                        } else {
 
-	                            std::memmove(client_buffer, client_buffer + parsed, readed_bytes - parsed);
-	                            readed_bytes -= parsed;
+	                            std::memmove(client_buffer, client_buffer + parsed, offset_position - parsed);
+	                            offset_position -= parsed;
 	                        }
 			}
 
 	                // There is command, but we still wait for argument to arrive...
 			if (_command_to_execute && arg_remains > 0) {
 		
-				_logger->debug("Fill argument: {} bytes of {}", readed_bytes, arg_remains);
+				_logger->debug("Fill argument: {} bytes of {}", offset_position, arg_remains);
         	                // There is some parsed command, and now we are reading argument
-                	        std::size_t to_read = std::min(arg_remains, std::size_t(readed_bytes));
+                	        std::size_t to_read = std::min(arg_remains, std::size_t(offset_position));
                         	argument_for_command.append(client_buffer, to_read);
 
-	                        std::memmove(client_buffer, client_buffer + to_read, readed_bytes - to_read);
+	                        std::memmove(client_buffer, client_buffer + to_read, offset_position - to_read);
 	                        arg_remains -= to_read;
-	                        readed_bytes -= to_read;
+	                        offset_position -= to_read;
 			}
 
                         // Thre is command & argument - RUN!
@@ -129,27 +131,31 @@ void Connection::DoRead(){
 // See Connection.h
 void Connection::DoWrite(){
 
-	try{
-		if( q_commands.empty() ){
-	
-			_event.events |= EPOLLOUT;
+	size_t all_sent = 0;
+
+	while( !q_commands.empty() ){
+
+		std::string result = q_commands.front();
+		auto sent = send(_socket, result.data() + all_sent, result.size() - all_sent, 0);
+		if( sent > 0 ){
+
+			all_sent += sent;
+			if( result.size() == all_sent ){
+
+				q_commands.pop_front();
+				all_sent = 0;
+			}
 		}
 		else{
-	
-			std::string result = q_commands.front();
-			q_commands.pop_front();
-	                        
-			// Send response
-			if (send(_socket, result.data(), result.size(), 0) <= 0) {
-				throw std::runtime_error("Failed to send response");
-			}
 
-		} 
-	}
-	catch( std::runtime_error &ex ){
-
-			_logger->error("Failed DoWrite function on current connection");
+			break;
 		}
+
+		if( q_commands.empty() ){
+		
+			_event.events &= ~EPOLLOUT;
+		}	
+	}
 }
 
 } // namespace STnonblock
