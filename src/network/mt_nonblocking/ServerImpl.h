@@ -5,7 +5,6 @@
 #include <vector>
 #include <unordered_map>
 #include <atomic>
-#include <set>
 
 #include "Connection.h"
 #include <afina/network/Server.h>
@@ -27,12 +26,9 @@ class Worker;
  */
 class ServerImpl : public Server {
 public:
-
-    // Чтобы все worker'ы знали друг о друге.
     std::mutex sock_manager;
     std::atomic<int> workers_count;
     std::unordered_map<int, Connection *> connections;
-
     ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl);
     ~ServerImpl();
 
@@ -73,8 +69,9 @@ private:
 
     // threads serving read/write requests
     std::vector<Worker> _workers;
-    std::set<Connection *> socket_set;
-    std::mutex _mutex;
+    bool joined = false;
+    bool stopped = false;
+    bool started = false;
 };
 
 } // namespace MTnonblock

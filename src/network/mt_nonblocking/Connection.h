@@ -1,15 +1,7 @@
-#ifndef AFINA_NETWORK_ST_NONBLOCKING_CONNECTION_H
-#define AFINA_NETWORK_ST_NONBLOCKING_CONNECTION_H
+#ifndef AFINA_NETWORK_MT_NONBLOCKING_CONNECTION_H
+#define AFINA_NETWORK_MT_NONBLOCKING_CONNECTION_H
 
 #include <cstring>
-#include <deque>
-#include <memory>
-
-#include <spdlog/logger.h>
-#include <afina/Storage.h>
-
-#include "protocol/Parser.h"
-#include <afina/execute/Command.h>
 
 #include <sys/epoll.h>
 
@@ -26,51 +18,51 @@ namespace MTnonblock {
 
 class Connection {
 public:
-    Connection( int s, 
-		std::shared_ptr<spdlog::logger> &logger,
-	        std::shared_ptr<Afina::Storage> &pStorage ) : _socket(s), 
-							      _logger{logger},
-                                                              pStorage{pStorage}{
-
-        //std::memset(&_event, 0, sizeof(struct epoll_event));
+    Connection(int s, std::shared_ptr<Afina::Storage> pstore, std::shared_ptr<spdlog::logger> l) : _socket(s), pStorage(pstore), _logger(l) {
+        std::memset(&_event, 0, sizeof(struct epoll_event));
         _event.data.ptr = this;
+        readed_bytes = 0;
+        offseti = 0;
+        offseto = 0;
+        arg_remains = 0;
+        alive = false;
     }
 
-    inline bool isAlive() const { return true; }
+    inline bool isAlive() const { return alive; }
 
     void Start();
 
-//protected:
+protected:
     void OnError();
     void OnClose();
-    void DoWrite();
     void DoRead();
+    void DoWrite();
 
-//private:
+private:
     friend class ServerImpl;
+    friend class Worker;
 
     int _socket;
-    bool _alive;
     struct epoll_event _event;
-    std::deque<std::string> q_commands;
-    
-    std::shared_ptr<spdlog::logger> &_logger;
-    std::shared_ptr<Afina::Storage> &pStorage;
+    bool alive;
 
-    Protocol::Parser _parser;
-    size_t _arg_remains;
-    std::string _argument_for_command;
-    std::unique_ptr<Execute::Command> _command_to_execute;    
+    static const std::size_t bufflen = 2048;
+    char rbuffer[bufflen];
+    int readed_bytes;
+    std::size_t offseti;
+    std::size_t offseto;
+
+    std::shared_ptr<Afina::Storage> pStorage;
+    std::shared_ptr<spdlog::logger> _logger;
+    std::list<std::string> answers;
+    std::size_t arg_remains;
     Protocol::Parser parser;
-    size_t arg_remains;
     std::string argument_for_command;
-    char client_buffer[4096];
-    size_t offset_position;
-
+    std::unique_ptr<Execute::Command> command_to_execute;
 };
 
 } // namespace MTnonblock
 } // namespace Network
 } // namespace Afina
 
-#endif // AFINA_NETWORK_ST_NONBLOCKING_CONNECTION_H
+#endif // AFINA_NETWORK_MT_NONBLOCKING_CONNECTION_H
