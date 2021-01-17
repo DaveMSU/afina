@@ -21,9 +21,10 @@ namespace Network {
 namespace MTnonblock {
 
 // See Worker.h
-Worker::Worker(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Afina::Logging::Service> pl)
+Worker::Worker(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Afina::Logging::Service> pl, Afina::Network::MTnonblock::ServerImpl * addr)
     : _pStorage(ps), _pLogging(pl), isRunning(false), _epoll_fd(-1) {
     // TODO: implementation here
+    _addr = addr;
 }
 
 // See Worker.h
@@ -76,6 +77,9 @@ void Worker::OnRun() {
     // for events to avoid thundering herd type behavior.
     int timeout = -1;
     std::array<struct epoll_event, 64> mod_list;
+
+    _addr->workers_count++;
+
     while (isRunning) {
         int nmod = epoll_wait(_epoll_fd, &mod_list[0], mod_list.size(), timeout);
         _logger->debug("Worker wokeup: {} events", nmod);
@@ -117,19 +121,49 @@ void Worker::OnRun() {
                 if ((epoll_ctl_retval = epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, pconn->_socket, &pconn->_event))) {
                     _logger->debug("epoll_ctl failed during connection rearm: error {}", epoll_ctl_retval);
                     pconn->OnError();
+                    close(pconn->_socket);
+
+
+                    {
+                        std::unique_lock<std::mutex> lock(_addr->sock_manager);
+                        _addr->connections.erase(pconn->_socket);
+                    }
+
+
                     delete pconn;
                 }
             }
             // Or delete closed one
             else {
                 if (epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, pconn->_socket, &pconn->_event)) {
-                    std::cerr << "Failed to delete connection!" << std::endl;
+                    std::cerr << "Failed to delete connection! " << std::string(strerror(errno)) << std::endl;
                 }
+                close(pconn->_socket);
+
+                {
+                    std::unique_lock<std::mutex> lock(_addr->sock_manager);
+                    _addr->connections.erase(pconn->_socket);
+                }
+
+
                 delete pconn;
             }
         }
         // TODO: Select timeout...
     }
+    _addr->workers_count--;
+        if (_addr->workers_count.load(std::memory_order_relaxed) == 0) {
+            std::unique_lock<std::mutex> lock(_addr->sock_manager, std::try_to_lock);
+            if (lock.owns_lock()) {
+                if (_addr->workers_count.load(std::memory_order_relaxed) == 0) {
+                    for (auto it = _addr->connections.begin(); it != _addr->connections.end(); it++) {
+                        close(it->second->_socket);
+                        delete it->second;
+                    }
+                    _addr->workers_count--;
+                }
+            }
+        }
     _logger->warn("Worker stopped");
 }
 

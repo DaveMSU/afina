@@ -3,7 +3,10 @@
 
 #include <thread>
 #include <vector>
+#include <unordered_map>
+#include <atomic>
 
+#include "Connection.h"
 #include <afina/network/Server.h>
 
 namespace spdlog {
@@ -23,6 +26,9 @@ class Worker;
  */
 class ServerImpl : public Server {
 public:
+    std::mutex sock_manager;
+    std::atomic<int> workers_count;
+    std::unordered_map<int, Connection *> connections;
     ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl);
     ~ServerImpl();
 
@@ -63,6 +69,9 @@ private:
 
     // threads serving read/write requests
     std::vector<Worker> _workers;
+    bool joined = false;
+    bool stopped = false;
+    bool started = false;
 };
 
 } // namespace MTnonblock
